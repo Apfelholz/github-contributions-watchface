@@ -1,2 +1,2 @@
-# Ignore the build directory
-build/
+# Ignore the build directory under github-contributions-wai
+github-contributions-watchface/build/
