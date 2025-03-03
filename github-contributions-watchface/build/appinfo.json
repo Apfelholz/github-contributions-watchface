@@ -1,0 +1,30 @@
+{
+    "targetPlatforms": [
+        "aplite", 
+        "basalt", 
+        "chalk", 
+        "diorite"
+    ], 
+    "displayName": "github-contributions-watchface", 
+    "name": "github-contributions-watchface", 
+    "messageKeys": {
+        "dummy": 10000
+    }, 
+    "companyName": "Apfelholz", 
+    "enableMultiJS": true, 
+    "versionLabel": "1.0", 
+    "capabilities": [], 
+    "sdkVersion": "3", 
+    "appKeys": {
+        "dummy": 10000
+    }, 
+    "longName": "github-contributions-watchface", 
+    "shortName": "github-contributions-watchface", 
+    "watchapp": {
+        "watchface": true
+    }, 
+    "resources": {
+        "media": []
+    }, 
+    "uuid": "5b873b76-e1cd-427f-9410-b9190071315f"
+}
