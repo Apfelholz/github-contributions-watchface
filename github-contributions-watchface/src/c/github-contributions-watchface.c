@@ -5,6 +5,7 @@
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static int s_contributions = 0;
+static AppTimer *s_timer;
 
 static void update_background_color() {
   GColor background_color;
@@ -38,6 +39,25 @@ static void update_time() {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
+}
+
+static void fetch_contributions() {
+  // Send a message to the JavaScript to fetch contributions
+  DictionaryIterator *out_iter;
+  AppMessageResult result = app_message_outbox_begin(&out_iter);
+
+  if (result == APP_MSG_OK) {
+    dict_write_uint8(out_iter, KEY_CONTRIBUTIONS, 0);
+    result = app_message_outbox_send();
+    if (result != APP_MSG_OK) {
+      APP_LOG(APP_LOG_LEVEL_ERROR, "Error sending the outbox: %d", (int)result);
+    }
+  } else {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Error preparing the outbox: %d", (int)result);
+  }
+
+  // Schedule the next fetch in 5 minutes
+  s_timer = app_timer_register(5 * 60 * 1000, fetch_contributions, NULL);
 }
 
 static void main_window_load(Window *window){
@@ -109,11 +129,17 @@ static void init() {
   app_message_register_inbox_dropped(inbox_dropped_callback);
   app_message_register_outbox_failed(outbox_failed_callback);
   app_message_register_outbox_sent(outbox_sent_callback);
+
+  // Start fetching contributions
+  fetch_contributions();
 }
 
 static void deinit() {
   tick_timer_service_unsubscribe();
   window_destroy(s_main_window);
+  if (s_timer != NULL) {
+    app_timer_cancel(s_timer);
+  }
 }
 
 int main(void) {
