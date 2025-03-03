@@ -8,7 +8,7 @@
     "displayName": "github-contributions-watchface", 
     "name": "github-contributions-watchface", 
     "messageKeys": {
-        "dummy": 10000
+        "KEY_CONTRIBUTIONS": 10000
     }, 
     "companyName": "Apfelholz", 
     "enableMultiJS": true, 
@@ -16,7 +16,7 @@
     "capabilities": [], 
     "sdkVersion": "3", 
     "appKeys": {
-        "dummy": 10000
+        "KEY_CONTRIBUTIONS": 10000
     }, 
     "longName": "github-contributions-watchface", 
     "shortName": "github-contributions-watchface", 
