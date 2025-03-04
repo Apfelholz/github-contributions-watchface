@@ -4,27 +4,31 @@
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
-static int s_contributions = 0;
+static int s_contributions[7][7];
 static AppTimer *s_timer;
 
 static void update_background_color() {
-  GColor background_color;
+  Layer *window_layer = window_get_root_layer(s_main_window);
+  GRect bounds = layer_get_bounds(window_layer);
 
-  if (s_contributions == 0) {
-    background_color = GColorDarkGray;
-  } else if (s_contributions <= 3) {
-    background_color = GColorDarkGreen;
-  } else if (s_contributions <= 5) {
-    background_color = GColorIslamicGreen;
-  } else if (s_contributions <= 7) {
-    background_color = GColorGreen;
-  } else if (s_contributions <= 10) {
-    background_color = GColorBrightGreen;
-  } else {
-    background_color = GColorMintGreen;
+  // Create a new bitmap layer for each day in the contributions array
+  for (int i = 0; i < 7; i++) {
+    for (int j = 0; j < 7; j++) {
+      int contributions = s_contributions[i][j];
+      int green_value = contributions > 255 ? 255 : contributions; // Cap the green value at 255
+
+      GRect frame = GRect(j * (bounds.size.w / 7), i * (bounds.size.h / 7), bounds.size.w / 7, bounds.size.h / 7);
+      Layer *bitmap_layer = layer_create(frame);
+
+      // Set the fill color based on the green value
+      layer_set_update_proc(bitmap_layer, (LayerUpdateProc) (Layer *layer, GContext *ctx) {
+        graphics_context_set_fill_color(ctx, GColorFromRGB(0, green_value, 0));
+        graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
+      });
+
+      layer_add_child(window_layer, bitmap_layer);
+    }
   }
-
-  window_set_background_color(s_main_window, background_color);
 }
 
 static void update_time() {
@@ -87,7 +91,16 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   while (t != NULL) {
     switch (t->key) {
       case KEY_CONTRIBUTIONS:
-        s_contributions = t->value->int32;
+        // Process the received contributions array
+        // Assuming the array is sent as a flat array of 49 integers
+        for (int i = 0; i < 7; i++) {
+          for (int j = 0; j < 7; j++) {
+            Tuple *tuple = dict_find(iterator, KEY_CONTRIBUTIONS + i * 7 + j);
+            if (tuple) {
+              s_contributions[i][j] = tuple->value->int32;
+            }
+          }
+        }
         update_background_color();
         break;
       default:
@@ -122,8 +135,8 @@ static void init() {
 
   app_message_register_inbox_received(inbox_received_callback);
   
-  const int inbox_size = 128;
-  const int outbox_size = 128;
+  const int inbox_size = 512;
+  const int outbox_size = 512;
   app_message_open(inbox_size, outbox_size);
 
   app_message_register_inbox_dropped(inbox_dropped_callback);
