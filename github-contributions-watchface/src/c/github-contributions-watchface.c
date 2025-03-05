@@ -7,25 +7,32 @@ static TextLayer *s_time_layer;
 static int s_contributions[7][7];
 static AppTimer *s_timer;
 
+static void update_layer(Layer layer, GContextctx);
+
+static void update_layer(Layer layer, GContextctx) {
+  int index_ptr = (int)layer_get_data(layer);
+  int index = index_ptr;
+  int i = index / 7;
+  int j = index % 7;
+  int contributions = s_contributions[i][j];
+  int green_value = contributions > 255 ? 255 : contributions; // Cap the green value at 255
+
+  graphics_context_set_fill_color(ctx, GColorFromRGB(0, green_value, 0));
+  graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
+}
+
 static void update_background_color() {
-  Layer *window_layer = window_get_root_layer(s_main_window);
+  Layerwindow_layer = window_get_root_layer(s_main_window);
   GRect bounds = layer_get_bounds(window_layer);
 
-  // Create a new bitmap layer for each day in the contributions array
   for (int i = 0; i < 7; i++) {
     for (int j = 0; j < 7; j++) {
-      int contributions = s_contributions[i][j];
-      int green_value = contributions > 255 ? 255 : contributions; // Cap the green value at 255
-
       GRect frame = GRect(j * (bounds.size.w / 7), i * (bounds.size.h / 7), bounds.size.w / 7, bounds.size.h / 7);
-      Layer *bitmap_layer = layer_create(frame);
+      Layer bitmap_layer = layer_create_with_data(frame, sizeof(int));
+      intindex_ptr = (int *)layer_get_data(bitmap_layer);
+      index_ptr = i 7 + j;
 
-      // Set the fill color based on the green value
-      layer_set_update_proc(bitmap_layer, (LayerUpdateProc) (Layer *layer, GContext *ctx) {
-        graphics_context_set_fill_color(ctx, GColorFromRGB(0, green_value, 0));
-        graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
-      });
-
+      layer_set_update_proc(bitmap_layer, update_layer);
       layer_add_child(window_layer, bitmap_layer);
     }
   }
@@ -91,8 +98,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   while (t != NULL) {
     switch (t->key) {
       case KEY_CONTRIBUTIONS:
-        // Process the received contributions array
-        // Assuming the array is sent as a flat array of 49 integers
         for (int i = 0; i < 7; i++) {
           for (int j = 0; j < 7; j++) {
             Tuple *tuple = dict_find(iterator, KEY_CONTRIBUTIONS + i * 7 + j);
