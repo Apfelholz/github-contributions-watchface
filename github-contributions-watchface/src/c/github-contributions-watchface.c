@@ -6,11 +6,11 @@ static Window *s_main_window;
 static TextLayer *s_time_layer;
 static int s_contributions[7][7];
 static AppTimer *s_timer;
+static char contributions_text[1024];
+static uint8_t s_buffer[7 * 7 * 4];
 
-static void update_layer(Layer layer, GContextctx);
-
-static void update_layer(Layer layer, GContextctx) {
-  int index_ptr = (int)layer_get_data(layer);
+static void update_layer(Layer *layer, GContext *ctx) {
+  int index_ptr = *(int *)layer_get_data(layer);
   int index = index_ptr;
   int i = index / 7;
   int j = index % 7;
@@ -22,15 +22,15 @@ static void update_layer(Layer layer, GContextctx) {
 }
 
 static void update_background_color() {
-  Layerwindow_layer = window_get_root_layer(s_main_window);
+  Layer *window_layer = window_get_root_layer(s_main_window);
   GRect bounds = layer_get_bounds(window_layer);
 
   for (int i = 0; i < 7; i++) {
     for (int j = 0; j < 7; j++) {
       GRect frame = GRect(j * (bounds.size.w / 7), i * (bounds.size.h / 7), bounds.size.w / 7, bounds.size.h / 7);
-      Layer bitmap_layer = layer_create_with_data(frame, sizeof(int));
-      intindex_ptr = (int *)layer_get_data(bitmap_layer);
-      index_ptr = i 7 + j;
+      Layer *bitmap_layer = layer_create_with_data(frame, sizeof(int));
+      int *index_ptr = (int *)layer_get_data(bitmap_layer);
+      *index_ptr = i * 7 + j;
 
       layer_set_update_proc(bitmap_layer, update_layer);
       layer_add_child(window_layer, bitmap_layer);
@@ -93,26 +93,29 @@ static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
 }
 
-static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  Tuple *t = dict_read_first(iterator);
-  while (t != NULL) {
-    switch (t->key) {
-      case KEY_CONTRIBUTIONS:
-        for (int i = 0; i < 7; i++) {
-          for (int j = 0; j < 7; j++) {
-            Tuple *tuple = dict_find(iterator, KEY_CONTRIBUTIONS + i * 7 + j);
-            if (tuple) {
-              s_contributions[i][j] = tuple->value->int32;
-            }
-          }
-        }
-        update_background_color();
-        break;
-      default:
-        APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);
-        break;
+// Callback-Funktion zum Empfangen der Nachricht von JavaScript
+static void inbox_received_callback(DictionaryIterator *iter, void *context) {
+  // Überprüfe, ob die Nachricht die erwarteten binären Daten enthält
+  Tuple *data_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
+  if (data_tuple) {
+    // Lese die binären Daten (Uint8Array) und speichere sie in den Puffer
+    uint8_t *data = data_tuple->value->data;
+
+    // Entpacke die Daten und speichere sie im 2D-Array contributions[7][7]
+    int index = 0;
+    for (int week = 0; week < 7; week++) {
+      for (int day = 0; day < 7; day++) {
+        // Entpacke den 32-Bit Integer (4 Bytes)
+        s_contributions[week][day] = 
+          (data[index] << 24) | 
+          (data[index + 1] << 16) | 
+          (data[index + 2] << 8) | 
+          data[index + 3];
+
+        index += 4;  // Wechsle zu den nächsten 4 Bytes
+      }
     }
-    t = dict_read_next(iterator);
+    update_background_color();
   }
 }
 
