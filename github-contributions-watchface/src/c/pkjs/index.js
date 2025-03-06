@@ -1,6 +1,8 @@
 Pebble.addEventListener('ready', function() {
   console.log('PebbleKit JS ready!');
+
   fetchContributions();
+
 });
 
 Pebble.addEventListener('appmessage', function(e) {
