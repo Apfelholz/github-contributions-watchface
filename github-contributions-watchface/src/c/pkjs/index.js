@@ -1,13 +1,11 @@
 Pebble.addEventListener('ready', function() {
   console.log('PebbleKit JS ready!');
-
-  fetchContributions();
-
+  sendContributions();
 });
 
 Pebble.addEventListener('appmessage', function(e) {
   console.log('AppMessage received!');
-  fetchContributions();
+  sendContributions();
 });
 
 function fetchContributions() {
@@ -58,7 +56,18 @@ function fetchContributions() {
   .catch(error => console.error('Fehler beim Abrufen der Beiträge:', error));
 }
 
-function sendContributions(contributions) {
+function sendContributions() {
+
+  // Testdaten
+  const contributions = [
+    [0, 1, 2, 3, 4, 5, 6],
+    [7, 8, 9, 10, 11, 12, 13],
+    [14, 15, 16, 17, 18, 19, 20],
+    [0, 1, 2, 3, 4, 5, 6],
+    [7, 8, 9, 10, 11, 12, 13],
+    [14, 15, 16, 17, 18, 19, 20],
+    [0, 1, 2, 3, 4, 5, 6]
+  ];
 
   // Wandelt das 2D-Array in ein Uint8Array um
   const data = new Uint8Array(7 * 7 * 4);  // 7x7 Tage, 4 Bytes pro Wert
