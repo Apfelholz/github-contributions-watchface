@@ -6,36 +6,45 @@ static Window *s_main_window;
 static TextLayer *s_time_layer;
 static int s_contributions[7][7];
 static AppTimer *s_timer;
-static char contributions_text[1024];
 static uint8_t s_buffer[7 * 7 * 4];
+static Layer *s_canvas_layer; 
 
-static void update_layer(Layer *layer, GContext *ctx) {
-  int index_ptr = *(int *)layer_get_data(layer);
-  int index = index_ptr;
-  int i = index / 7;
-  int j = index % 7;
-  int contributions = s_contributions[i][j];
-  int green_value = contributions > 255 ? 255 : contributions; // Cap the green value at 255
+static void canvas_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  GRect frame = grect_inset(bounds, GEdgeInsets(0));
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, frame, 0, GCornerNone);
 
-  graphics_context_set_fill_color(ctx, GColorFromRGB(0, green_value, 0));
-  graphics_fill_rect(ctx, layer_get_bounds(layer), 0, GCornerNone);
-}
+  int cell_size = (bounds.size.w / 7) - 1;
+  int coner_radius = 5;
 
-static void update_background_color() {
-  Layer *window_layer = window_get_root_layer(s_main_window);
-  GRect bounds = layer_get_bounds(window_layer);
+  int x = 2;
+  int y = 0;
+  for (int week = 0; week < 7; week++) {
+    for (int day = 0; day < 7; day++) {
+      int contributions = s_contributions[week][day];
+      GColor color = GColorWhite;
+      if (contributions == 0) {
+        color = GColorDarkGray;
+      } else if (contributions < 3) {
+        color = GColorDarkGreen;
+      } else if (contributions < 6) {
+        color = GColorIslamicGreen;
+      } else if (contributions < 30) {
+        color = GColorGreen;
+      } else {
+        color = GColorWhite;
+      }
 
-  for (int i = 0; i < 7; i++) {
-    for (int j = 0; j < 7; j++) {
-      GRect frame = GRect(j * (bounds.size.w / 7), i * (bounds.size.h / 7), bounds.size.w / 7, bounds.size.h / 7);
-      Layer *bitmap_layer = layer_create_with_data(frame, sizeof(int));
-      int *index_ptr = (int *)layer_get_data(bitmap_layer);
-      *index_ptr = i * 7 + j;
+      GRect cell = GRect(x, y, cell_size, cell_size);
+      graphics_context_set_fill_color(ctx, color);
+      graphics_fill_rect(ctx, cell, coner_radius, GCornersAll);
 
-      layer_set_update_proc(bitmap_layer, update_layer);
-      layer_add_child(window_layer, bitmap_layer);
+      x += cell_size + 1;
     }
-  }
+    x = 2;
+    y += cell_size + 1;
+  }  
 }
 
 static void update_time() {
@@ -68,29 +77,32 @@ static void fetch_contributions() {
   }
 
   // Schedule the next fetch in 5 minutes
-  s_timer = app_timer_register(5 * 60 * 1000, fetch_contributions, NULL);
+  s_timer = app_timer_register(1 * 10 * 1000, fetch_contributions, NULL);
 }
 
 static void main_window_load(Window *window){
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
-  s_time_layer = text_layer_create(
-    GRect(0, PBL_IF_ROUND_ELSE(58, 52), bounds.size.w, 50));
+  s_canvas_layer = layer_create(bounds);
+  layer_set_update_proc(s_canvas_layer, canvas_update_proc);
+  layer_add_child(window_layer, s_canvas_layer);
+
+  s_time_layer = text_layer_create(GRect(0, PBL_IF_ROUND_ELSE(58, 52), bounds.size.w, 50));
   
   text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_text_color(s_time_layer, GColorBlack);
-  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
-  text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
+  text_layer_set_text_color(s_time_layer, GColorWhite);
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  layer_set_frame(text_layer_get_layer(s_time_layer), GRect(1, bounds.size.h - 35, bounds.size.w - 2, 30));
 
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
-
-  update_background_color();
   update_time();
 }
 
 static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
+  layer_destroy(s_canvas_layer);
 }
 
 // Callback-Funktion zum Empfangen der Nachricht von JavaScript
@@ -115,7 +127,15 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
         index += 4;  // Wechsle zu den nächsten 4 Bytes
       }
     }
-    update_background_color();
+
+    // Log the contributions array
+    for (int week = 0; week < 7; week++) {
+      for (int day = 0; day < 7; day++) {
+        APP_LOG(APP_LOG_LEVEL_INFO, "s_contributions[%d][%d] = %d", week, day, s_contributions[week][day]);
+      }
+    }
+
+    layer_mark_dirty(s_canvas_layer);
   }
 }
 
@@ -139,7 +159,8 @@ static void init() {
     .unload = main_window_unload
   });
   window_stack_push(s_main_window, true);
-  update_time();
+
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler); // Subscribe to the tick timer service
 
   app_message_register_inbox_received(inbox_received_callback);
   
@@ -153,10 +174,11 @@ static void init() {
 
   // Start fetching contributions
   fetch_contributions();
+  layer_mark_dirty(s_canvas_layer);
 }
 
 static void deinit() {
-  tick_timer_service_unsubscribe();
+  tick_timer_service_unsubscribe(); // Unsubscribe from the tick timer service
   window_destroy(s_main_window);
   if (s_timer != NULL) {
     app_timer_cancel(s_timer);
