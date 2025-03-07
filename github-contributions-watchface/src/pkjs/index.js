@@ -1,3 +1,4 @@
+
 Pebble.addEventListener('ready', function() {
   console.log('PebbleKit JS ready!');
 
@@ -11,7 +12,7 @@ Pebble.addEventListener('appmessage', function(e) {
 });
 
 function fetchContributions() {
-  const query = 
+  const query = `
     query GetUserContributions($userName: String!) {
       user(login: $userName) {
         contributionsCollection {
@@ -27,7 +28,7 @@ function fetchContributions() {
         }
       }
     }
-  ;
+  `;
 
   const variables = {
     userName: "Apfelholz" // Benutzername hier einsetzen
@@ -82,8 +83,13 @@ function sendContributions() {
     }
   }
 
-  Pebble.sendAppMessage({ "Data": data.buffer },
-    function() { console.log("Contributions sent successfully!"); },
-    function(error) { console.log("Error sending data: " + JSON.stringify(error)); }
-  );
+  var dict = {
+    'KEY_CONTRIBUTIONS': data
+  };
+
+  Pebble.sendAppMessage(dict, function() {
+    console.log('Contributions sent to Pebble successfully!');
+  }, function(error) {
+    console.log('Error sending contributions to Pebble!', error);
+  });
 }

@@ -82,6 +82,7 @@ static void fetch_contributions() {
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
+  
   Tuple *data_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
   if (data_tuple) {
     uint8_t *data = data_tuple->value->data;

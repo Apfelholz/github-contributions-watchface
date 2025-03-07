@@ -24,6 +24,8 @@
       "watchface": true
     },
     "messageKeys": [
+      "KEY_GITHUB_USERNAME",
+      "KEY_GITHUB_TOKEN",
       "KEY_CONTRIBUTIONS"
     ],
     "resources": {
