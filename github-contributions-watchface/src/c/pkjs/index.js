@@ -57,44 +57,31 @@ function fetchContributions() {
 }
 
 function sendContributions() {
-
-  // Testdaten
   const contributions = [
     [0, 1, 2, 3, 4, 5, 6],
     [7, 8, 9, 10, 11, 12, 13],
     [14, 15, 16, 17, 18, 19, 20],
-    [0, 1, 2, 3, 4, 5, 6],
-    [7, 8, 9, 10, 11, 12, 13],
-    [14, 15, 16, 17, 18, 19, 20],
-    [0, 1, 2, 3, 4, 5, 6]
+    [21, 22, 23, 24, 25, 26, 27],
+    [28, 29, 30, 31, 32, 33, 34],
+    [35, 36, 37, 38, 39, 40, 41],
+    [42, 43, 44, 45, 46, 47, 48]
   ];
 
-  // Wandelt das 2D-Array in ein Uint8Array um
-  const data = new Uint8Array(7 * 7 * 4);  // 7x7 Tage, 4 Bytes pro Wert
-
+  const data = new Uint8Array(7 * 7 * 4);
   let index = 0;
   for (let week = 0; week < 7; week++) {
     for (let day = 0; day < 7; day++) {
       const contribution = contributions[week][day];
-
-      // Packe den Beitrag (32-Bit Integer) in die Binärdaten (4 Bytes)
-      data[index] = (contribution >> 24) & 0xFF;      // Höchstes Byte
-      data[index + 1] = (contribution >> 16) & 0xFF;  // Zweites Byte
-      data[index + 2] = (contribution >> 8) & 0xFF;   // Drittens Byte
-      data[index + 3] = contribution & 0xFF;           // Niedrigstes Byte
-
+      data[index] = (contribution >> 24) & 0xFF;
+      data[index + 1] = (contribution >> 16) & 0xFF;
+      data[index + 2] = (contribution >> 8) & 0xFF;
+      data[index + 3] = contribution & 0xFF;
       index += 4;
     }
   }
 
-  // Senden der Binärdaten an die Pebble App
-  var dict = {
-    'Data': data.buffer
-  };
-
-  Pebble.sendAppMessage(dict, function() {
-    console.log("Contributions sent successfully!");
-  }, function(error) {
-    console.log("Error sending data: " + error);
-  });
+  Pebble.sendAppMessage({ "Data": data.buffer },
+    function() { console.log("Contributions sent successfully!"); },
+    function(error) { console.log("Error sending data: " + JSON.stringify(error)); }
+  );
 }
