@@ -115,38 +115,11 @@ static void main_window_load(Window *window) {
   text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 
-  update_background_color();
   update_time();
 }
 
 static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
-}
-
-// Callback-Funktion zum Empfangen der Nachricht von JavaScript
-static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-  // Überprüfe, ob die Nachricht die erwarteten binären Daten enthält
-  Tuple *data_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
-  if (data_tuple) {
-    // Lese die binären Daten (Uint8Array) und speichere sie in den Puffer
-    uint8_t *data = data_tuple->value->data;
-
-    // Entpacke die Daten und speichere sie im 2D-Array contributions[7][7]
-    int index = 0;
-    for (int week = 0; week < 7; week++) {
-      for (int day = 0; day < 7; day++) {
-        // Entpacke den 32-Bit Integer (4 Bytes)
-        s_contributions[week][day] = 
-          (data[index] << 24) | 
-          (data[index + 1] << 16) | 
-          (data[index + 2] << 8) | 
-          data[index + 3];
-
-        index += 4;  // Wechsle zu den nächsten 4 Bytes
-      }
-    }
-    update_background_color();
-  }
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {

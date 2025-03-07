@@ -2,9 +2,13 @@
   "name": "github-contributions-watchface",
   "author": "Apfelholz",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
   "pebble": {
     "displayName": "github-contributions-watchface",
     "uuid": "5b873b76-e1cd-427f-9410-b9190071315f",
