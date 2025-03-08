@@ -9,6 +9,7 @@ static AppTimer *s_timer;
 static Layer *s_canvas_layer;
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Drawing canvas.");
   GRect bounds = layer_get_bounds(layer);
   GRect frame = grect_inset(bounds, GEdgeInsets(0));
   graphics_context_set_fill_color(ctx, GColorBlack);
@@ -60,14 +61,15 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 
 static void fetch_contributions() {
   if (s_timer) {
-    app_timer_cancel(s_timer);
+    s_timer = NULL;
   }
 
   DictionaryIterator *out_iter;
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
   if (result == APP_MSG_OK) {
-    dict_write_uint8(out_iter, KEY_CONTRIBUTIONS, 0);
+    int value = 0;
+    dict_write_int(out_iter, KEY_CONTRIBUTIONS, &value, sizeof(int), true);
     result = app_message_outbox_send();
     if (result == APP_MSG_OK) {
       APP_LOG(APP_LOG_LEVEL_INFO, "Request sent successfully.");
@@ -82,23 +84,16 @@ static void fetch_contributions() {
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-  
-  Tuple *data_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
-  if (data_tuple) {
-    uint8_t *data = data_tuple->value->data;
-    int index = 0;
-    for (int week = 0; week < 7; week++) {
-      for (int day = 0; day < 7; day++) {
-        s_contributions[week][day] = 
-          (data[index] << 24) | 
-          (data[index + 1] << 16) | 
-          (data[index + 2] << 8) | 
-          data[index + 3];
-        index += 4;
-      }
-    }
-    layer_mark_dirty(s_canvas_layer);
+  Tuple *contributions_tupel = dict_find(iter, KEY_CONTRIBUTIONS);
+  int32_t con = 0;
+  if (contributions_tupel) {
+    con = contributions_tupel->value->int32;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Received contributions: %d", (int)con);
+  } else {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "No contributions found in message.");
   }
+  s_contributions[0][0] = (int)con;
+  layer_mark_dirty(s_canvas_layer);
 }
 
 static void main_window_load(Window *window) {
@@ -147,6 +142,12 @@ static void init() {
 
   app_message_register_inbox_received(inbox_received_callback);
   app_message_open(512, 512);
+
+  for(int week = 0; week < 7; week++) {
+    for(int day = 0; day < 7; day++) {
+      s_contributions[week][day] = 0;
+    }
+  }
 
   fetch_contributions();
 }
