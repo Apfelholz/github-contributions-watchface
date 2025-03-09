@@ -84,7 +84,7 @@ static void fetch_contributions() {
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-  Tuple *contributions_tupel = dict_find(iter, KEY_CONTRIBUTIONS);
+  Tuple *contributions_tupel = dict_find(iter, MESSAGE_KEY_KEY_CONTRIBUTIONS);
   int32_t con = 0;
   if (contributions_tupel) {
     con = contributions_tupel->value->int32;
@@ -141,6 +141,9 @@ static void init() {
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 
   app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
   app_message_open(512, 512);
 
   for(int week = 0; week < 7; week++) {
