@@ -1,9 +1,9 @@
 var Clay = require("pebble-clay");
-var clayConfig = require("./config.json");
+var clayConfig = require("./config");
 var clay = new Clay(clayConfig);
 
-var githubUsername = "";
-var githubToken = "";
+var githubUsername = "Apfelholz";
+var githubToken = "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";
 
 Pebble.addEventListener("ready", function() {
   console.log("PebbleKit JS ready!");
