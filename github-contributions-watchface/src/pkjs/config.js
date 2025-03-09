@@ -1,6 +1,4 @@
-
-{
-  "config": [
+module.exports =[
     {
       "type": "heading",
       "defaultValue": "Api Configuration"
@@ -37,4 +35,4 @@
       "defaultValue": "Save Settings"
     }
   ]
-}
+
