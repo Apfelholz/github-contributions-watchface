@@ -1,13 +1,16 @@
 #include <pebble.h>
 
 #define KEY_CONTRIBUTIONS 0
+#define KEY_GITHUB_USERNAME 1
+#define KEY_GITHUB_TOKEN 2
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static uint8_t s_contributions[49];
 static AppTimer *s_timer;
 static Layer *s_canvas_layer;
-static uint8_t con;
+static char s_github_username[32];
+static char s_github_token[64];
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Drawing canvas.");
@@ -69,8 +72,8 @@ static void fetch_contributions() {
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
   if (result == APP_MSG_OK) {
-    int value = 0;
-    dict_write_int(out_iter, KEY_CONTRIBUTIONS, &value, sizeof(int), true);
+    dict_write_cstring(out_iter, KEY_GITHUB_USERNAME, s_github_username);
+    dict_write_cstring(out_iter, KEY_GITHUB_TOKEN, s_github_token);
     result = app_message_outbox_send();
     if (result == APP_MSG_OK) {
       APP_LOG(APP_LOG_LEVEL_INFO, "Request sent successfully.");
@@ -85,12 +88,23 @@ static void fetch_contributions() {
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-  Tuple *contributions_tupel = dict_find(iter, MESSAGE_KEY_KEY_CONTRIBUTIONS);
-  const int length = 49;
+  Tuple *contributions_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
+  Tuple *username_tuple = dict_find(iter, KEY_GITHUB_USERNAME);
+  Tuple *token_tuple = dict_find(iter, KEY_GITHUB_TOKEN);
 
-  uint8_t *con = NULL;
-  if (contributions_tupel) {
-    con = contributions_tupel->value->data;
+  if (username_tuple) {
+    snprintf(s_github_username, sizeof(s_github_username), "%s", username_tuple->value->cstring);
+    APP_LOG(APP_LOG_LEVEL_INFO, "Received GitHub username: %s", s_github_username);
+  }
+
+  if (token_tuple) {
+    snprintf(s_github_token, sizeof(s_github_token), "%s", token_tuple->value->cstring);
+    APP_LOG(APP_LOG_LEVEL_INFO, "Received GitHub token: %s", s_github_token);
+  }
+
+  if (contributions_tuple) {
+    const int length = 49;
+    uint8_t *con = contributions_tuple->value->data;
     APP_LOG(APP_LOG_LEVEL_INFO, "Received contributions");
     for (int i = 0; i < length; i++) {
       APP_LOG(APP_LOG_LEVEL_INFO, "Raw Byte %d: %d", i, con[i]);
@@ -151,12 +165,6 @@ static void init() {
   app_message_register_outbox_failed(outbox_failed_callback);
   app_message_register_outbox_sent(outbox_sent_callback);
   app_message_open(512, 512);
-
-  for(int week = 0; week < 7; week++) {
-    for(int day = 0; day < 7; day++) {
-      s_contributions[week*7+day] = 0;
-    }
-  }
 
   fetch_contributions();
 }

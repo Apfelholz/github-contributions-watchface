@@ -10,6 +10,9 @@
     "pebble-clay": "^1.0.4"
   },
   "main" : "index.js",
+  "capabilities": [ 
+    "configurable" 
+  ],
   "pebble": {
     "displayName": "github-contributions-watchface",
     "uuid": "5b873b76-e1cd-427f-9410-b9190071315f",
@@ -25,7 +28,9 @@
       "watchface": true
     },
     "messageKeys": [
-      "KEY_CONTRIBUTIONS"
+      "KEY_CONTRIBUTIONS",
+      "KEY_GITHUB_USERNAME",
+      "KEY_GITHUB_TOKEN"
     ],
     "resources": {
       "media": []
