@@ -4,9 +4,10 @@
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
-static int s_contributions[7][7];
+static uint8_t s_contributions[49];
 static AppTimer *s_timer;
 static Layer *s_canvas_layer;
+static uint8_t con;
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Drawing canvas.");
@@ -22,7 +23,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   int y = 0;
   for (int week = 0; week < 7; week++) {
     for (int day = 0; day < 7; day++) {
-      int contributions = s_contributions[week][day];
+      uint8_t contributions = s_contributions[week*7+day];
       GColor color = GColorWhite;
       if (contributions == 0) {
         color = GColorDarkGray;
@@ -85,14 +86,19 @@ static void fetch_contributions() {
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
   Tuple *contributions_tupel = dict_find(iter, MESSAGE_KEY_KEY_CONTRIBUTIONS);
-  int32_t con = 0;
+  const int length = 49;
+
+  uint8_t *con = NULL;
   if (contributions_tupel) {
-    con = contributions_tupel->value->int32;
-    APP_LOG(APP_LOG_LEVEL_INFO, "Received contributions: %d", (int)con);
+    con = contributions_tupel->value->data;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Received contributions");
+    for (int i = 0; i < length; i++) {
+      APP_LOG(APP_LOG_LEVEL_INFO, "Raw Byte %d: %d", i, con[i]);
+    }
+    memcpy(s_contributions, con, length);
   } else {
     APP_LOG(APP_LOG_LEVEL_ERROR, "No contributions found in message.");
   }
-  s_contributions[0][0] = (int)con;
   layer_mark_dirty(s_canvas_layer);
 }
 
@@ -148,7 +154,7 @@ static void init() {
 
   for(int week = 0; week < 7; week++) {
     for(int day = 0; day < 7; day++) {
-      s_contributions[week][day] = 0;
+      s_contributions[week*7+day] = 0;
     }
   }
 
