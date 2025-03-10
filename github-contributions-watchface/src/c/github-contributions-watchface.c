@@ -10,8 +10,13 @@ static TextLayer *s_time_layer;
 static uint8_t s_contributions[49];
 static AppTimer *s_timer;
 static Layer *s_canvas_layer;
-static char s_github_username[32];
-static char s_github_token[64];
+
+typedef struct ClaySettings {
+  char github_username[32];
+  char github_token[64];
+} ClaySettings;
+
+static ClaySettings settings;
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -37,7 +42,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
       } else if (contributions < 30) {
         color = GColorGreen;
       }
-      
+
       GRect cell = GRect(x, y, cell_size, cell_size);
       graphics_context_set_fill_color(ctx, color);
       graphics_fill_rect(ctx, cell, coner_radius, GCornersAll);
@@ -46,7 +51,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
     }
     x = 2;
     y += cell_size + 1;
-  }  
+  }
 }
 
 static void update_time() {
@@ -65,15 +70,15 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 
 static void fetch_contributions() {
   if (s_timer) {
+    app_timer_cancel(s_timer);
     s_timer = NULL;
   }
-
   DictionaryIterator *out_iter;
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
   if (result == APP_MSG_OK) {
-    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_USERNAME, s_github_username);
-    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_TOKEN, s_github_token);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_USERNAME, settings.github_username);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_TOKEN, settings.github_token);
     result = app_message_outbox_send();
     if (result != APP_MSG_OK) {
       APP_LOG(APP_LOG_LEVEL_ERROR, "Error sending request: %d", result);
@@ -85,15 +90,12 @@ static void fetch_contributions() {
   s_timer = app_timer_register(1 * 20 * 1000, fetch_contributions, NULL);
 }
 
-typedef struct ClaySettings {
-  char github_username[32];
-  char github_token[64];
-} ClaySettings;
-
-static ClaySettings settings;
-
 static void prv_save_settings() {
   persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
+static void prv_load_settings(void) {
+  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
 
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
@@ -102,14 +104,18 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
   Tuple *token_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_TOKEN);
 
   if (username_tuple) {
-    snprintf(s_github_username, sizeof(s_github_username), "%s", username_tuple->value->cstring);
+    snprintf(settings.github_username, sizeof(settings.github_username), "%s", username_tuple->value->cstring);
   }
 
   if (token_tuple) {
-    snprintf(s_github_token, sizeof(s_github_token), "%s", token_tuple->value->cstring);
+    snprintf(settings.github_token, sizeof(settings.github_token), "%s", token_tuple->value->cstring);
   }
 
-  prv_save_settings();
+  if (username_tuple || token_tuple) {
+    prv_save_settings();
+    fetch_contributions();
+  }
+
 
   if (contributions_tuple) {
     const int length = 49;
@@ -147,7 +153,12 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
-} 
+  if (s_timer) {
+    app_timer_cancel(s_timer);
+    s_timer = NULL;
+  }
+  s_timer = app_timer_register(1000, fetch_contributions, NULL);
+}
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
@@ -168,6 +179,7 @@ static void init() {
   app_message_register_outbox_failed(outbox_failed_callback);
   app_message_register_outbox_sent(outbox_sent_callback);
   app_message_open(512, 512);
+  prv_load_settings();
 
   fetch_contributions();
 }
