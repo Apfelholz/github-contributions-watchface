@@ -1,9 +1,9 @@
 var Clay = require("pebble-clay");
-var clayConfig = require("./config");
+var clayConfig = require("./config.js");
 var clay = new Clay(clayConfig);
 
-var githubUsername = "Apfelholz";
-var githubToken = "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";
+var githubUsername = "";
+var githubToken = "";
 
 Pebble.addEventListener("ready", function() {
   console.log("PebbleKit JS ready!");
@@ -11,14 +11,12 @@ Pebble.addEventListener("ready", function() {
 });
 
 Pebble.addEventListener("appmessage", function(e) {
-  console.log("AppMessage received!");
-  if (e.payload.KEY_GITHUB_USERNAME) {
-    githubUsername = e.payload.KEY_GITHUB_USERNAME;
-    console.log("Received GitHub username: " + githubUsername);
+  var dict = e.payload;
+  if (dict["KEY_GITHUB_TOKEN"]) {
+    githubUsername = dict["KEY_GITHUB_USERNAME"];
   }
-  if (e.payload.KEY_GITHUB_TOKEN) {
-    githubToken = e.payload.KEY_GITHUB_TOKEN;
-    console.log("Received GitHub token: " + githubToken);
+  if (dict["KEY_GITHUB_USERNAME"]) {
+    githubToken = dict["KEY_GITHUB_TOKEN"];
   }
   fetchContributions();
 });
@@ -30,19 +28,20 @@ function fetchContributions() {
   }
 
   var query = "query GetUserContributions($userName: String!) {" +
-              "user(login: $userName) {" +
-              "contributionsCollection {" +
-              "contributionCalendar {" +
-              "totalContributions" +
-              "weeks {" +
-              "contributionDays {" +
-              "contributionCount" +
-              "date" +
-              "}" +
-              "}" +
-              "}" +
-              "}" +
-              "}";
+  "  user(login: $userName) {" +
+  "    contributionsCollection {" +
+  "      contributionCalendar {" +
+  "        totalContributions" +
+  "        weeks {" +
+  "          contributionDays {" +
+  "            contributionCount" +
+  "            date" +
+  "          }" +
+  "        }" +
+  "      }" +
+  "    }" +
+  "  }" +
+  "}";
 
   var variables = { userName: githubUsername };
 
@@ -56,7 +55,7 @@ function fetchContributions() {
       if (xhr.status === 200) {
         var response = JSON.parse(xhr.responseText);
         if (response.errors) {
-          console.error("Fehler bei der Anfrage:", response.errors);
+          console.error("Fehler bei der Anfrage:", JSON.stringify(response.errors, null, 2));
           return;
         }
 
@@ -89,9 +88,11 @@ function sendContributions(contributions) {
   contributions = contributions || []; // Fallback auf leeres Array, wenn keine Beiträge übergeben wurden
 
   var buffer = new ArrayBuffer(contributions.length);
-  var view = new Uint8Array(buffer);
-  for (var i = 0; i < contributions.length; i++) {
-    view[i] = contributions[i];
+  var view = new Uint8Array(49);
+  var index = 0;
+  for (var i = contributions.length; i > contributions.length-49; i--) {
+    view[index] = contributions[i];
+    index++;
   }
 
   var dict = {
@@ -99,8 +100,8 @@ function sendContributions(contributions) {
   };
 
   Pebble.sendAppMessage(dict, function() {
-    console.log("Contributions sent to Pebble successfully!" + JSON.stringify(dict));
+    console.log("Contributions sent to Pebble successfully!");
   }, function(error) {
-    console.log("Error sending contributions to Pebble!", error);
+    console.error("Error sending contributions to Pebble!", error);
   });
 }
