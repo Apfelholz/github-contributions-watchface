@@ -3,6 +3,7 @@
 #define KEY_CONTRIBUTIONS 0
 #define KEY_GITHUB_USERNAME 1
 #define KEY_GITHUB_TOKEN 2
+#define SETTINGS_KEY 3
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
@@ -13,7 +14,6 @@ static char s_github_username[32];
 static char s_github_token[64];
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "Drawing canvas.");
   GRect bounds = layer_get_bounds(layer);
   GRect frame = grect_inset(bounds, GEdgeInsets(0));
   graphics_context_set_fill_color(ctx, GColorBlack);
@@ -72,12 +72,10 @@ static void fetch_contributions() {
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
   if (result == APP_MSG_OK) {
-    dict_write_cstring(out_iter, KEY_GITHUB_USERNAME, s_github_username);
-    dict_write_cstring(out_iter, KEY_GITHUB_TOKEN, s_github_token);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_USERNAME, s_github_username);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_TOKEN, s_github_token);
     result = app_message_outbox_send();
-    if (result == APP_MSG_OK) {
-      APP_LOG(APP_LOG_LEVEL_INFO, "Request sent successfully.");
-    } else {
+    if (result != APP_MSG_OK) {
       APP_LOG(APP_LOG_LEVEL_ERROR, "Error sending request: %d", result);
     }
   } else {
@@ -87,33 +85,38 @@ static void fetch_contributions() {
   s_timer = app_timer_register(1 * 20 * 1000, fetch_contributions, NULL);
 }
 
+typedef struct ClaySettings {
+  char github_username[32];
+  char github_token[64];
+} ClaySettings;
+
+static ClaySettings settings;
+
+static void prv_save_settings() {
+  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
 static void inbox_received_callback(DictionaryIterator *iter, void *context) {
-  Tuple *contributions_tuple = dict_find(iter, KEY_CONTRIBUTIONS);
-  Tuple *username_tuple = dict_find(iter, KEY_GITHUB_USERNAME);
-  Tuple *token_tuple = dict_find(iter, KEY_GITHUB_TOKEN);
+  Tuple *contributions_tuple = dict_find(iter, MESSAGE_KEY_KEY_CONTRIBUTIONS);
+  Tuple *username_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_USERNAME);
+  Tuple *token_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_TOKEN);
 
   if (username_tuple) {
     snprintf(s_github_username, sizeof(s_github_username), "%s", username_tuple->value->cstring);
-    APP_LOG(APP_LOG_LEVEL_INFO, "Received GitHub username: %s", s_github_username);
   }
 
   if (token_tuple) {
     snprintf(s_github_token, sizeof(s_github_token), "%s", token_tuple->value->cstring);
-    APP_LOG(APP_LOG_LEVEL_INFO, "Received GitHub token: %s", s_github_token);
   }
+
+  prv_save_settings();
 
   if (contributions_tuple) {
     const int length = 49;
     uint8_t *con = contributions_tuple->value->data;
-    APP_LOG(APP_LOG_LEVEL_INFO, "Received contributions");
-    for (int i = 0; i < length; i++) {
-      APP_LOG(APP_LOG_LEVEL_INFO, "Raw Byte %d: %d", i, con[i]);
-    }
     memcpy(s_contributions, con, length);
-  } else {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "No contributions found in message.");
+    layer_mark_dirty(s_canvas_layer);
   }
-  layer_mark_dirty(s_canvas_layer);
 }
 
 static void main_window_load(Window *window) {

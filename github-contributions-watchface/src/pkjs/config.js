@@ -25,7 +25,7 @@ module.exports =[
           "defaultValue": "",
           "label": "Github Token",
           "attributes": {
-            "placeholder": "Bearer Token"
+            "placeholder": "Token"
           }
         }
       ]
