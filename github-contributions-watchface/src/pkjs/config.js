@@ -1,38 +1,39 @@
-module.exports =[
-    {
-      "type": "heading",
-      "defaultValue": "Api Configuration"
-    },
-    {
-      "type": "section",
-      "items": [
-        {
-          "type": "heading",
-          "defaultValue": "Github"
-        },
-        {
-          "type": "input",
-          "messageKey": "KEY_GITHUB_USERNAME",
-          "defaultValue": "",
-          "label": "Username",
-          "attributes": {
-            "placeholder": "Username"
-          }
-        },
-        {
-          "type": "input",
-          "messageKey": "KEY_GITHUB_TOKEN",
-          "defaultValue": "",
-          "label": "Github Token",
-          "attributes": {
-            "placeholder": "Token"
-          }
+module.exports = [
+  {
+    "type": "heading",
+    "defaultValue": "Api Configuration"
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Github"
+      },
+      {
+        "type": "input",
+        "messageKey": "KEY_GITHUB_USERNAME",
+        "defaultValue": "",
+        "label": "Username",
+        "attributes": {
+          "placeholder": "Username"
         }
-      ]
-    },
-    {
-      "type": "submit",
-      "defaultValue": "Save Settings"
-    }
-  ]
+      },
+      {
+        "type": "input",
+        "messageKey": "KEY_GITHUB_TOKEN",
+        "defaultValue": "",
+        "label": "Github Token",
+        "description": "You can generate a token at <a href='https://github.com/settings/tokens'>here</a>. The token needs the 'user:read' permission.",
+        "attributes": {
+          "placeholder": "Token"
+        }
+      }
+    ]
+  },
+  {
+    "type": "submit",
+    "defaultValue": "Save Settings"
+  }
+];
 
