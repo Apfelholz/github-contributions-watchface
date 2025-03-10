@@ -7,4 +7,22 @@ A Pebble watchface that dynamically changes its background color based on your G
 - Fetches GitHub contributions every 5 minutes.
 - Background color changes from dark gray (no contributions) to various shades of green (more contributions).
 
+## Screenshots
 
+![aplite](aplite.png)
+![basalt](basalt.png)
+![diorite](diorite.png)
+
+## Installation
+
+The watchface is available on the Pebble app store: [GitHub Contributions Watchface](https://apps.rebble.io/en_US/application/67ce34d2b7a0230391426cbe).
+
+## Configuration
+
+1. Open the Pebble app on your phone.
+2. Navigate to the settings of the GitHub Contributions Watchface.
+3. Enter your GitHub username and a personal access token with the `read:user` permission.
+
+## License
+
+This project is licensed under the Apache License 2.0. See the [`LICENSE`](LICENSE) file for details.
