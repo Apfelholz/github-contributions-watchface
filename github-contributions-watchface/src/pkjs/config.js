@@ -33,7 +33,8 @@ module.exports = [
   },
   {
     "type": "heading",
-    "defaultValue": "Misc. Settings"
+    "defaultValue": "Misc. Settings",
+    "capabilities": ["BW"]
   },
   [
     {
