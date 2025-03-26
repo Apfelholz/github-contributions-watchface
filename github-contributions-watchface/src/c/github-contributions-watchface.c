@@ -55,10 +55,16 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 #else
+/**
+ * Helper function for set_pixel_color. Sets the individual bit in a byte
+ */
 static void byte_set_bit(uint8_t *byte, uint8_t bit, uint8_t value) {
   *byte ^= (-value ^ *byte) & (1 << bit);
 }
 
+/**
+ * Set the pixel value to black or white
+ */
 static void set_pixel_color(uint8_t *data, GPoint point, uint8_t bytes_per_row,
                             uint8_t color) {
   size_t byte = point.y * bytes_per_row + point.x / 8;
@@ -66,11 +72,40 @@ static void set_pixel_color(uint8_t *data, GPoint point, uint8_t bytes_per_row,
   byte_set_bit(&data[byte], bit, color);
 }
 
+/**
+ * From https://en.wikipedia.org/wiki/Ordered_dithering
+ * The 4x4 Bayer matrix
+ */
+// static uint8_t bayer_matrix_2x2[] = {
+//     0,
+//     127,
+//     191,
+//     63,
+// };
+static uint8_t bayer_matrix_4x4[] = {
+    0, 128, 32, 159, 191, 64, 223, 96, 48, 175, 16, 143, 239, 112, 207, 80,
+};
+// static uint8_t bayer_matrix_8x8[] = {
+//     0,  127, 31, 159, 7,  135, 39, 167, 191, 63,  223, 95,  199, 71,  231,
+//     103, 47, 175, 15, 143, 55, 183, 23, 151, 239, 111, 207, 79,  247, 119,
+//     215, 87, 11, 139, 43, 171, 3,  131, 35, 163, 203, 75,  235, 107, 195, 67,
+//     227, 99, 59, 187, 27, 155, 51, 179, 19, 147, 251, 123, 219, 91,  243,
+//     115, 211, 83,
+// };
+
+/**
+ * Dithers an area of white using Bayer dithering
+ * @param data The image data
+ * @param cell The rectangle to apply dithering to
+ * @param bytes_per_row The number of bytes per row (gotten from the GBitmap)
+ * @param value The brightness of the average colour after dithering
+ */
 static void dither_rect(uint8_t *data, GRect cell, uint8_t bytes_per_row,
-                        uint8_t darkness) {
+                        uint8_t value) {
   for (int y = cell.origin.y; y < cell.origin.y + cell.size.h; y++) {
     for (int x = cell.origin.x; x < cell.origin.x + cell.size.w; x++) {
-      if ((x + y) % darkness) {
+      uint8_t threshold = bayer_matrix_4x4[(y % 4) * 4 + x % 4];
+      if (value < threshold) {
         set_pixel_color(data, GPoint(x, y), bytes_per_row, 0);
       }
     }
@@ -86,6 +121,8 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   int cell_size = (bounds.size.w / 7) - 1;
   int coner_radius = 5;
 
+  // Draw rounded squares first as a mask because I don't want to bother doing
+  // the math for the corner radii
   int x = 2;
   int y = 0;
   graphics_context_set_fill_color(ctx, GColorWhite);
@@ -107,21 +144,21 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   for (int week = 0; week < 7; week++) {
     for (int day = 0; day < 7; day++) {
       uint8_t contributions = s_contributions[week * 7 + day];
-      uint8_t darkness = 2;
+      uint8_t value = 1;
       if (contributions == 0) {
-        darkness = 5;
+        value = 4;
       } else if (contributions < 3) {
-        darkness = 4;
+        value = 3;
       } else if (contributions < 6) {
-        darkness = 3;
-      }
-      if (darkness != 5) {
-        GRect cell = GRect(x, y, cell_size, cell_size);
-        dither_rect(data, cell, bytes_per_row, darkness);
+        value = 2;
       }
 
-      // Dither
-      // Iterate over all rows
+      if (value != 4) {
+        // Scale to a range of 64 - 192
+        value *= 64;
+        GRect cell = GRect(x, y, cell_size, cell_size);
+        dither_rect(data, cell, bytes_per_row, value);
+      }
 
       x += cell_size + 1;
     }
