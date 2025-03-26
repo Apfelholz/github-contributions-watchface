@@ -19,6 +19,8 @@ typedef struct ClaySettings {
 
 static ClaySettings settings;
 
+static void fetch_contributions();
+
 #ifdef PBL_COLOR
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -27,7 +29,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, frame, 0, GCornerNone);
 
   int cell_size = (bounds.size.w / 7) - 1;
-  int coner_radius = 5;
+  int corner_radius = 5;
 
   int x = 2;
   int y = 0;
@@ -47,7 +49,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
 
       GRect cell = GRect(x, y, cell_size, cell_size);
       graphics_context_set_fill_color(ctx, color);
-      graphics_fill_rect(ctx, cell, coner_radius, GCornersAll);
+      graphics_fill_rect(ctx, cell, corner_radius, GCornersAll);
 
       x += cell_size + 1;
     }
@@ -138,7 +140,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, frame, 0, GCornerNone);
 
   int cell_size = (bounds.size.w / 7) - 1;
-  int coner_radius = 5;
+  int corner_radius = 5;
 
   // Draw rounded squares first as a mask because I don't want to bother doing
   // the math for the corner radii
@@ -148,7 +150,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   for (int week = 0; week < 7; week++) {
     for (int day = 0; day < 7; day++) {
       GRect cell = GRect(x, y, cell_size, cell_size);
-      graphics_fill_rect(ctx, cell, coner_radius, GCornersAll);
+      graphics_fill_rect(ctx, cell, corner_radius, GCornersAll);
       x += cell_size + 1;
     }
     x = 2;
@@ -163,20 +165,21 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   for (int week = 0; week < 7; week++) {
     for (int day = 0; day < 7; day++) {
       uint8_t contributions = s_contributions[week * 7 + day];
-      uint8_t value = 1;
+      uint8_t value = 5;
       if (contributions == 0) {
         value = 4;
       } else if (contributions < 3) {
         value = 3;
       } else if (contributions < 6) {
         value = 2;
+      } else if (contributions < 30) {
+        value = 1;
       }
 
-      if (value != 4) {
+      if (value != 5) {
         GRect cell = GRect(x, y, cell_size, cell_size);
         if (settings.is_dithered) {
-          // Scale to a range of 64 - 192
-          value *= 64;
+          value = value * 255 / 5;
           dither_rect(data, cell, bytes_per_row, value);
         } else {
           stripe_rect(data, cell, bytes_per_row, 6 - value);
@@ -192,10 +195,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
 }
 #endif
 
-static void update_time() {
-  time_t temp = time(NULL);
-  struct tm *tick_time = localtime(&temp);
-
+static void update_time(struct tm *tick_time) {
   static char s_buffer[8];
   strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M",
            tick_time);
@@ -204,14 +204,15 @@ static void update_time() {
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  update_time();
+  if (units_changed & MINUTE_UNIT) {
+    update_time(tick_time);
+    if (tick_time->tm_min % 5 == 0) {
+      fetch_contributions();
+    }
+  }
 }
 
 static void fetch_contributions() {
-  if (s_timer) {
-    app_timer_cancel(s_timer);
-    s_timer = NULL;
-  }
   DictionaryIterator *out_iter;
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
@@ -227,8 +228,6 @@ static void fetch_contributions() {
   } else {
     APP_LOG(APP_LOG_LEVEL_ERROR, "Error beginning message: %d", result);
   }
-
-  s_timer = app_timer_register(1 * 20 * 1000, fetch_contributions, NULL);
 }
 
 static void prv_save_settings() {
@@ -236,6 +235,7 @@ static void prv_save_settings() {
 }
 
 static void prv_load_settings(void) {
+  // Make dithering the default
   settings.is_dithered = true;
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
@@ -256,13 +256,15 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
              token_tuple->value->cstring);
   }
 
-  if (username_tuple || token_tuple) {
-    prv_save_settings();
-    fetch_contributions();
-  }
-
   if (is_dithered_tuple) {
     settings.is_dithered = is_dithered_tuple->value->int32;
+  }
+
+  if (is_dithered_tuple || username_tuple || token_tuple) {
+    prv_save_settings();
+    if (username_tuple || token_tuple) {
+      fetch_contributions();
+    }
   }
 
   if (contributions_tuple) {
@@ -290,10 +292,13 @@ static void main_window_load(Window *window) {
                       fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 
-  update_time();
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  update_time(tick_time);
 }
 
 static void main_window_unload(Window *window) {
+  layer_destroy(s_canvas_layer);
   text_layer_destroy(s_time_layer);
 }
 
