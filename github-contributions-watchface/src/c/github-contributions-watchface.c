@@ -18,6 +18,7 @@ typedef struct ClaySettings {
 
 static ClaySettings settings;
 
+#ifdef PBL_COLOR
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GRect frame = grect_inset(bounds, GEdgeInsets(0));
@@ -31,7 +32,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   int y = 0;
   for (int week = 0; week < 7; week++) {
     for (int day = 0; day < 7; day++) {
-      uint8_t contributions = s_contributions[week*7+day];
+      uint8_t contributions = s_contributions[week * 7 + day];
       GColor color = GColorWhite;
       if (contributions == 0) {
         color = GColorDarkGray;
@@ -53,13 +54,91 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
     y += cell_size + 1;
   }
 }
+#else
+static void byte_set_bit(uint8_t *byte, uint8_t bit, uint8_t value) {
+  *byte ^= (-value ^ *byte) & (1 << bit);
+}
+
+static void set_pixel_color(uint8_t *data, GPoint point, uint8_t bytes_per_row,
+                            uint8_t color) {
+  size_t byte = point.y * bytes_per_row + point.x / 8;
+  size_t bit = point.x % 8;
+  byte_set_bit(&data[byte], bit, color);
+}
+
+static void dither_rect(uint8_t *data, GRect cell, uint8_t bytes_per_row,
+                        uint8_t darkness) {
+  for (int y = cell.origin.y; y < cell.origin.y + cell.size.h; y++) {
+    for (int x = cell.origin.x; x < cell.origin.x + cell.size.w; x++) {
+      if ((x + y) % darkness) {
+        set_pixel_color(data, GPoint(x, y), bytes_per_row, 0);
+      }
+    }
+  }
+}
+
+static void canvas_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  GRect frame = grect_inset(bounds, GEdgeInsets(0));
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, frame, 0, GCornerNone);
+
+  int cell_size = (bounds.size.w / 7) - 1;
+  int coner_radius = 5;
+
+  int x = 2;
+  int y = 0;
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  for (int week = 0; week < 7; week++) {
+    for (int day = 0; day < 7; day++) {
+      GRect cell = GRect(x, y, cell_size, cell_size);
+      graphics_fill_rect(ctx, cell, coner_radius, GCornersAll);
+      x += cell_size + 1;
+    }
+    x = 2;
+    y += cell_size + 1;
+  }
+
+  x = 2;
+  y = 0;
+  GBitmap *fb = graphics_capture_frame_buffer(ctx);
+  uint8_t *data = gbitmap_get_data(fb);
+  uint16_t bytes_per_row = gbitmap_get_bytes_per_row(fb);
+  for (int week = 0; week < 7; week++) {
+    for (int day = 0; day < 7; day++) {
+      uint8_t contributions = s_contributions[week * 7 + day];
+      uint8_t darkness = 2;
+      if (contributions == 0) {
+        darkness = 5;
+      } else if (contributions < 3) {
+        darkness = 4;
+      } else if (contributions < 6) {
+        darkness = 3;
+      }
+      if (darkness != 5) {
+        GRect cell = GRect(x, y, cell_size, cell_size);
+        dither_rect(data, cell, bytes_per_row, darkness);
+      }
+
+      // Dither
+      // Iterate over all rows
+
+      x += cell_size + 1;
+    }
+    x = 2;
+    y += cell_size + 1;
+  }
+  graphics_release_frame_buffer(ctx, fb);
+}
+#endif
 
 static void update_time() {
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
 
   static char s_buffer[8];
-  strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
+  strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M",
+           tick_time);
 
   text_layer_set_text(s_time_layer, s_buffer);
 }
@@ -77,8 +156,10 @@ static void fetch_contributions() {
   AppMessageResult result = app_message_outbox_begin(&out_iter);
 
   if (result == APP_MSG_OK) {
-    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_USERNAME, settings.github_username);
-    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_TOKEN, settings.github_token);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_USERNAME,
+                       settings.github_username);
+    dict_write_cstring(out_iter, MESSAGE_KEY_KEY_GITHUB_TOKEN,
+                       settings.github_token);
     result = app_message_outbox_send();
     if (result != APP_MSG_OK) {
       APP_LOG(APP_LOG_LEVEL_ERROR, "Error sending request: %d", result);
@@ -104,18 +185,19 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
   Tuple *token_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_TOKEN);
 
   if (username_tuple) {
-    snprintf(settings.github_username, sizeof(settings.github_username), "%s", username_tuple->value->cstring);
+    snprintf(settings.github_username, sizeof(settings.github_username), "%s",
+             username_tuple->value->cstring);
   }
 
   if (token_tuple) {
-    snprintf(settings.github_token, sizeof(settings.github_token), "%s", token_tuple->value->cstring);
+    snprintf(settings.github_token, sizeof(settings.github_token), "%s",
+             token_tuple->value->cstring);
   }
 
   if (username_tuple || token_tuple) {
     prv_save_settings();
     fetch_contributions();
   }
-
 
   if (contributions_tuple) {
     const int length = 49;
@@ -133,11 +215,13 @@ static void main_window_load(Window *window) {
   layer_set_update_proc(s_canvas_layer, canvas_update_proc);
   layer_add_child(window_layer, s_canvas_layer);
 
-  s_time_layer = text_layer_create(GRect(0, bounds.size.h - 35, bounds.size.w, 30));
+  s_time_layer =
+      text_layer_create(GRect(0, bounds.size.h - 35, bounds.size.w, 30));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorWhite);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
-  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_font(s_time_layer,
+                      fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 
   update_time();
@@ -151,7 +235,8 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
 }
 
-static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+static void outbox_failed_callback(DictionaryIterator *iterator,
+                                   AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
   if (s_timer) {
     app_timer_cancel(s_timer);
@@ -166,10 +251,9 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 
 static void init() {
   s_main_window = window_create();
-  window_set_window_handlers(s_main_window, (WindowHandlers) {
-    .load = main_window_load,
-    .unload = main_window_unload
-  });
+  window_set_window_handlers(
+      s_main_window,
+      (WindowHandlers){.load = main_window_load, .unload = main_window_unload});
   window_stack_push(s_main_window, true);
 
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
