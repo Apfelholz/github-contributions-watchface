@@ -14,6 +14,7 @@ static Layer *s_canvas_layer;
 typedef struct ClaySettings {
   char github_username[32];
   char github_token[64];
+  bool is_dithered;
 } ClaySettings;
 
 static ClaySettings settings;
@@ -112,6 +113,24 @@ static void dither_rect(uint8_t *data, GRect cell, uint8_t bytes_per_row,
   }
 }
 
+/**
+ * Dithers an area of white using Bayer dithering
+ * @param data The image data
+ * @param cell The rectangle to apply dithering to
+ * @param bytes_per_row The number of bytes per row (gotten from the GBitmap)
+ * @param value The darkness of the average colour after dithering
+ */
+static void stripe_rect(uint8_t *data, GRect cell, uint8_t bytes_per_row,
+                        uint8_t value) {
+  for (int y = cell.origin.y; y < cell.origin.y + cell.size.h; y++) {
+    for (int x = cell.origin.x; x < cell.origin.x + cell.size.w; x++) {
+      if ((x + y) % value) {
+        set_pixel_color(data, GPoint(x, y), bytes_per_row, 0);
+      }
+    }
+  }
+}
+
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GRect frame = grect_inset(bounds, GEdgeInsets(0));
@@ -154,10 +173,14 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
       }
 
       if (value != 4) {
-        // Scale to a range of 64 - 192
-        value *= 64;
         GRect cell = GRect(x, y, cell_size, cell_size);
-        dither_rect(data, cell, bytes_per_row, value);
+        if (settings.is_dithered) {
+          // Scale to a range of 64 - 192
+          value *= 64;
+          dither_rect(data, cell, bytes_per_row, value);
+        } else {
+          stripe_rect(data, cell, bytes_per_row, 6 - value);
+        }
       }
 
       x += cell_size + 1;
@@ -213,6 +236,7 @@ static void prv_save_settings() {
 }
 
 static void prv_load_settings(void) {
+  settings.is_dithered = true;
   persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
 
@@ -220,6 +244,7 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
   Tuple *contributions_tuple = dict_find(iter, MESSAGE_KEY_KEY_CONTRIBUTIONS);
   Tuple *username_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_USERNAME);
   Tuple *token_tuple = dict_find(iter, MESSAGE_KEY_KEY_GITHUB_TOKEN);
+  Tuple *is_dithered_tuple = dict_find(iter, MESSAGE_KEY_KEY_IS_DITHERED);
 
   if (username_tuple) {
     snprintf(settings.github_username, sizeof(settings.github_username), "%s",
@@ -234,6 +259,10 @@ static void inbox_received_callback(DictionaryIterator *iter, void *context) {
   if (username_tuple || token_tuple) {
     prv_save_settings();
     fetch_contributions();
+  }
+
+  if (is_dithered_tuple) {
+    settings.is_dithered = is_dithered_tuple->value->int32;
   }
 
   if (contributions_tuple) {

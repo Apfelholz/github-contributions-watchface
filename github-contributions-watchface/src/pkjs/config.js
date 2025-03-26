@@ -32,6 +32,19 @@ module.exports = [
     ]
   },
   {
+    "type": "heading",
+    "defaultValue": "Misc. Settings"
+  },
+  [
+    {
+      "type": "toggle",
+      "messageKey": "KEY_IS_DITHERED",
+      "defaultValue": true,
+      "label": "On for dithering, off for stripes",
+      "capabilities": ["BW"]
+    }
+  ],
+  {
     "type": "submit",
     "defaultValue": "Save Settings"
   }
