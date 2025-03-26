@@ -4,7 +4,7 @@ A Pebble watchface that dynamically changes its background color based on your G
 
 ## Features
 
-- Fetches GitHub contributions every five minutes.
+- Fetches GitHub contributions every hour.
 - Background color changes from dark gray (no contributions) to various shades of green (more contributions) to white (over 30 contributions).
 - Black and white platforms have two different shading options -- Bayer dithering and stripes.
 
