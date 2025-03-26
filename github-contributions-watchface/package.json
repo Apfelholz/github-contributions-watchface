@@ -9,9 +9,9 @@
   "dependencies": {
     "pebble-clay": "^1.0.4"
   },
-  "main" : "index.js",
-  "capabilities": [ 
-    "configurable" 
+  "main": "index.js",
+  "capabilities": [
+    "configurable"
   ],
   "pebble": {
     "displayName": "github-contributions-watchface",
@@ -29,7 +29,8 @@
     "messageKeys": [
       "KEY_CONTRIBUTIONS",
       "KEY_GITHUB_USERNAME",
-      "KEY_GITHUB_TOKEN"
+      "KEY_GITHUB_TOKEN",
+      "KEY_IS_DITHERED"
     ],
     "resources": {
       "media": []
