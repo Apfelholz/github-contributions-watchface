@@ -206,9 +206,9 @@ static void update_time(struct tm *tick_time) {
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   if (units_changed & MINUTE_UNIT) {
     update_time(tick_time);
-    if (tick_time->tm_min % 5 == 0) {
-      fetch_contributions();
-    }
+  }
+  if (units_changed & HOUR_UNIT) {
+    fetch_contributions();
   }
 }
 
